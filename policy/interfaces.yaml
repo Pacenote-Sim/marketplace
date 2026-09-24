@@ -1,0 +1,16 @@
+# The contract versions the current client and server accept. A tag built
+# against any other version is refused before a person reads it.
+#
+# Bump a list when a host release starts accepting a new version; remove a
+# version when no supported host accepts it any more.
+interfaces:
+  plugin: [3]          # github.com/pacenote-sim/plugin — server plugins
+  clientplugin: [1]    # github.com/pacenote-sim/clientplugin — sources and companions
+
+# The modules a client plugin may always import. Everything else outside the
+# standard library has to be listed under dependencies in the manifest, with a
+# reason.
+contracts:
+  - github.com/pacenote-sim/clientplugin
+  - github.com/pacenote-sim/plugin
+  - github.com/pacenote-sim/protocol

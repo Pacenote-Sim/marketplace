@@ -1,0 +1,20 @@
+name: visual-telemetry
+kind: server
+title: Visual telemetry
+summary: "Draws every lap as it was driven: speed, revs, throttle and brake against distance, sectors marked, the circuit alongside."
+author: Pacenote
+contact: plugins@pacenote.tech
+repository: https://github.com/Pacenote-Sim/visual-telemetry
+module: github.com/pacenote-sim/visual-telemetry
+licence: GPL-3.0
+visibility: public
+pricing: free
+calls: []
+companion_of: client-visual-telemetry
+versions:
+  - tag: v0.1.0
+    approved: 2026-09-24
+    reviewer: mihai
+    interface_version: 3
+    status: approved
+    notes: First listing. Calls nothing outside the machine and spends nothing.

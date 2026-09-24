@@ -1,0 +1,21 @@
+name: engineer
+kind: server
+title: Race engineer
+summary: "Coaches your drivers from their own laps: a line for the corner ahead, the radio in a race, a debrief with setup changes."
+author: Pacenote
+contact: plugins@pacenote.tech
+repository: https://github.com/Pacenote-Sim/engineer
+module: github.com/pacenote-sim/engineer
+licence: GPL-3.0
+visibility: public
+pricing: free
+calls:
+  - api.anthropic.com
+companion_of: client-engineer
+versions:
+  - tag: v0.2.0
+    approved: 2026-09-24
+    reviewer: mihai
+    interface_version: 3
+    status: approved
+    notes: First listing. The words are written by a language model on the operator's own key; every number in them was measured first.

@@ -1,0 +1,29 @@
+# Every plugin builds for every platform below with CGO_ENABLED=0. A plugin that
+# needs cgo is not eligible for the marketplace: Pacenote's CI builds on Linux
+# and every artifact it serves must be reproducible there.
+platforms:
+  # A server plugin runs beside a server, which ships for these.
+  server:
+    - { os: linux,   arch: amd64 }
+    - { os: linux,   arch: arm64 }
+    - { os: darwin,  arch: arm64 }
+    - { os: darwin,  arch: amd64 }
+    - { os: windows, arch: amd64 }
+  # A client plugin is compiled into pacenote.exe, and the client's own CI
+  # builds on Linux and macOS too, so it must compile everywhere the client does.
+  client:
+    - { os: windows, arch: amd64 }
+    - { os: linux,   arch: amd64 }
+    - { os: darwin,  arch: arm64 }
+
+# Literals the host scan never reports, for every plugin: where the project's
+# own documentation and repositories live. A plugin's page may link to them.
+known_hosts:
+  - pacenote.tech
+  - www.pacenote.tech
+  - github.com
+  - pkg.go.dev
+  - localhost
+  - example.com
+  - example.org
+  - www.w3.org        # the namespace every SVG document names

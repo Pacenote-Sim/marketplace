@@ -1,0 +1,114 @@
+# What a client plugin may import. Compiled-in code has no sandbox, so this
+# list is the sandbox, and it is public so an author can read it before
+# writing a line.
+#
+# A companion talks to its server plugin through the host the client lends it,
+# plays audio through the host, shows a page through the host. It has no
+# business reading the disk, opening a socket or running a program. A source
+# reads one simulator, which on Windows means shared memory and the
+# occasional file, so its list is wider.
+#
+# A standard package that is not listed needs an imports_allow entry in the
+# manifest with a reason, which the reviewer reads. The deny_symbols below
+# apply whatever the lists say: a companion may import net/http for the method
+# constants and the Header type, and may never build an http.Client.
+
+companion:
+  std:
+    - bytes
+    - cmp
+    - container/heap
+    - container/list
+    - context
+    - encoding
+    - encoding/base64
+    - encoding/binary
+    - encoding/csv
+    - encoding/hex
+    - encoding/json
+    - errors
+    - fmt
+    - hash
+    - hash/crc32
+    - hash/fnv
+    - html
+    - html/template
+    - io
+    - iter
+    - log/slog
+    - maps
+    - math
+    - math/bits
+    - math/rand/v2
+    - mime
+    - net/http      # constants and types only; see deny_symbols
+    - net/url
+    - path
+    - regexp
+    - slices
+    - sort
+    - strconv
+    - strings
+    - sync
+    - sync/atomic
+    - text/template
+    - time
+    - unicode
+    - unicode/utf8
+  deny_symbols:
+    net/http: [Client, DefaultClient, DefaultTransport, Transport, Get, Head, Post, PostForm, ListenAndServe, ListenAndServeTLS, Serve, ServeTLS, NewServeMux, Handle, HandleFunc, DefaultServeMux, Server]
+    net: [Dial, DialTimeout, DialTCP, DialUDP, DialIP, DialUnix, Listen, ListenPacket, ListenTCP, ListenUDP, ListenIP, ListenUnix, Dialer, ListenConfig]
+    crypto/tls: [Dial, DialWithDialer, Listen, NewListener]
+    os/exec: [Command, CommandContext, LookPath]
+    os: [Create, OpenFile, WriteFile, Remove, RemoveAll, Mkdir, MkdirAll, Rename, StartProcess, Exit, Chmod, Chown, Truncate, Getenv, Environ, ReadFile, Open, ReadDir]
+    plugin: [Open]
+    syscall: [Exec, ForkExec, StartProcess, Socket, Connect, Listen]
+    unsafe: [Pointer]
+    reflect: [NewAt]
+
+source:
+  std:
+    - bufio
+    - bytes
+    - cmp
+    - context
+    - encoding
+    - encoding/base64
+    - encoding/binary
+    - encoding/hex
+    - encoding/json
+    - errors
+    - fmt
+    - hash
+    - hash/crc32
+    - io
+    - io/fs
+    - iter
+    - log/slog
+    - maps
+    - math
+    - math/bits
+    - os
+    - path
+    - path/filepath
+    - regexp
+    - runtime
+    - slices
+    - sort
+    - strconv
+    - strings
+    - sync
+    - sync/atomic
+    - syscall
+    - time
+    - unicode
+    - unicode/utf8
+    - unsafe
+  deny_symbols:
+    net/http: [Client, DefaultClient, DefaultTransport, Transport, Get, Head, Post, PostForm, ListenAndServe, ListenAndServeTLS, Serve, ServeTLS, NewServeMux, Handle, HandleFunc, DefaultServeMux, Server, NewRequest, NewRequestWithContext]
+    net: [Dial, DialTimeout, DialTCP, DialUDP, DialIP, DialUnix, Listen, ListenPacket, ListenTCP, ListenUDP, ListenIP, ListenUnix, Dialer, ListenConfig]
+    crypto/tls: [Dial, DialWithDialer, Listen, NewListener]
+    os/exec: [Command, CommandContext, LookPath]
+    os: [StartProcess, Exit]
+    plugin: [Open]
+    syscall: [Exec, ForkExec, StartProcess, Socket, Connect, Listen]

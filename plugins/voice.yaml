@@ -1,0 +1,23 @@
+name: voice
+kind: server
+title: Voice
+summary: Turns a line of text into speech on the operator's own key, so what the other plugins write can be heard.
+author: Pacenote
+contact: plugins@pacenote.tech
+repository: https://github.com/Pacenote-Sim/voice
+module: github.com/pacenote-sim/voice
+licence: GPL-3.0
+visibility: public
+pricing: free
+calls:
+  - api.cartesia.ai
+companion_of: client-voice
+not_hosts:
+  - play.cartesia.ai   # named in a setting's help text so the operator knows where to find a voice id; never dialled
+versions:
+  - tag: v0.1.0
+    approved: 2026-09-24
+    reviewer: mihai
+    interface_version: 3
+    status: approved
+    notes: First listing. A line spoken once in the same voice is kept and served again without a second call.

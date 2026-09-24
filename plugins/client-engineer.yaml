@@ -1,0 +1,20 @@
+name: client-engineer
+kind: companion
+title: Race engineer
+summary: Posts each lap's corners to the engineer and plays its line as each corner approaches; shows the debrief when the stint ends.
+author: Pacenote
+contact: plugins@pacenote.tech
+repository: https://github.com/Pacenote-Sim/client-engineer
+module: github.com/pacenote-sim/client-engineer
+licence: GPL-3.0
+visibility: public
+pricing: free
+calls: []
+companion_of: engineer
+versions:
+  - tag: v0.1.0
+    approved: 2026-09-24
+    reviewer: mihai
+    interface_version: 1
+    status: approved
+    notes: First listing. Measures nothing and compares nothing; carries laps to engineer and plays what comes back.

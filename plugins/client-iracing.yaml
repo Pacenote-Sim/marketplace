@@ -1,0 +1,25 @@
+name: client-iracing
+kind: source
+title: iRacing
+summary: Reads iRacing while it runs and turns it into laps and corners the client understands.
+author: Pacenote
+contact: plugins@pacenote.tech
+repository: https://github.com/Pacenote-Sim/client-iracing
+module: github.com/pacenote-sim/client-iracing
+licence: GPL-3.0
+visibility: public
+pricing: free
+simulators: [iracing]
+calls: []
+dependencies:
+  - value: go.yaml.in/yaml/v3
+    reason: iRacing publishes its session text as YAML; this decodes it.
+  - value: golang.org/x/sys
+    reason: Opens iRacing's shared memory and its data-ready event on Windows.
+versions:
+  - tag: v0.1.0
+    approved: 2026-09-24
+    reviewer: mihai
+    interface_version: 1
+    status: approved
+    notes: First listing. Reads the shared memory in Go with no C; plays .ibt files on a machine without the game.

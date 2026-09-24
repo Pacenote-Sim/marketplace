@@ -1,0 +1,32 @@
+name: client-voice
+kind: companion
+title: Voice
+summary: The one plugin that makes sound. Plays audio that arrives with a line; speaks words that arrive without one.
+author: Pacenote
+contact: plugins@pacenote.tech
+repository: https://github.com/Pacenote-Sim/client-voice
+module: github.com/pacenote-sim/client-voice
+licence: GPL-3.0
+visibility: public
+pricing: free
+calls: []
+companion_of: voice
+dependencies:
+  - value: github.com/ebitengine/oto/v3
+    reason: Plays audio through the machine's speakers without cgo, so a server can cross-build the exe.
+  - value: github.com/hajimehoshi/go-mp3
+    reason: Decodes the MP3 the voice plugin returns.
+not_hosts:
+  - system.speech.synthesis.speechsynthesizer   # a .NET class named in the PowerShell command that speaks on Windows
+imports_allow:
+  - value: os/exec
+    reason: Falls back to the machine's own voice (say on macOS, System.Speech on Windows, espeak on Linux) when the voice plugin cannot answer.
+  - value: runtime
+    reason: Picks the fallback voice command for the operating system it runs on.
+versions:
+  - tag: v0.1.0
+    approved: 2026-09-24
+    reviewer: mihai
+    interface_version: 1
+    status: approved
+    notes: First listing. Volume and mode are on its page; the client itself has no settings.

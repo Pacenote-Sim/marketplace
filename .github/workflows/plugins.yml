@@ -1,0 +1,71 @@
+# A pull request that adds or changes a manifest: validate every manifest, then
+# fetch and check the newest approved tag of each plugin the pull request
+# touched. This is the automated half of the review. The human half is
+# REVIEW.md, and the merge.
+name: plugins
+
+on:
+  pull_request:
+    paths:
+      - "plugins/**"
+      - "policy/**"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: plugins-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  validate:
+    name: validate manifests
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      changed: ${{ steps.changed.outputs.files }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+      - uses: actions/setup-go@v7
+        with:
+          go-version: "1.26"
+      - run: go run ./cmd/marketplace validate
+      - id: changed
+        name: which manifests this pull request touches
+        run: |
+          files=$(git diff --name-only --diff-filter=AM "origin/${{ github.base_ref }}"...HEAD -- 'plugins/*.yaml' | jq -R -s -c 'split("\n") | map(select(length > 0))')
+          echo "files=$files" >> "$GITHUB_OUTPUT"
+          echo "changed: $files"
+
+  check:
+    name: check ${{ matrix.manifest }}
+    needs: validate
+    if: needs.validate.outputs.changed != '[]'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        manifest: ${{ fromJSON(needs.validate.outputs.changed) }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: actions/setup-go@v7
+        with:
+          go-version: "1.26"
+      - run: go install golang.org/x/vuln/cmd/govulncheck@latest
+      # A private repository is fetched with the review account's token. The
+      # author granted pacenote-review read access before opening the request.
+      - name: private modules
+        env:
+          REVIEW_TOKEN: ${{ secrets.PACENOTE_REVIEW_TOKEN }}
+        run: |
+          if [ -n "$REVIEW_TOKEN" ]; then
+            git config --global url."https://pacenote-review:${REVIEW_TOKEN}@github.com/".insteadOf "https://github.com/"
+            echo "GOPRIVATE=github.com/*" >> "$GITHUB_ENV"
+          fi
+      - run: go run ./cmd/marketplace check --vuln "${{ matrix.manifest }}"

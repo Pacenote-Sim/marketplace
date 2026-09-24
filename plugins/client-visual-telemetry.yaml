@@ -1,0 +1,20 @@
+name: client-visual-telemetry
+kind: companion
+title: Visual telemetry
+summary: Sends every completed lap to be drawn as a chart and links to the result on its page.
+author: Pacenote
+contact: plugins@pacenote.tech
+repository: https://github.com/Pacenote-Sim/client-visual-telemetry
+module: github.com/pacenote-sim/client-visual-telemetry
+licence: GPL-3.0
+visibility: public
+pricing: free
+calls: []
+companion_of: visual-telemetry
+versions:
+  - tag: v0.1.0
+    approved: 2026-09-24
+    reviewer: mihai
+    interface_version: 1
+    status: approved
+    notes: First listing. Does nothing at all unless the server is running the other half.

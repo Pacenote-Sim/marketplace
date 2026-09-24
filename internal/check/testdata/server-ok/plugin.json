@@ -1,0 +1,2 @@
+{"name": "demo-server", "version": "0.1.0", "author": "test", "interface_version": 3, "binary": "demo",
+ "capabilities": {"events": ["lap.completed"], "network": true, "calls": ["api.example-vendor.com"]}}
