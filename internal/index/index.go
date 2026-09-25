@@ -14,6 +14,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/pacenote-sim/marketplace/internal/manifest"
@@ -130,9 +131,21 @@ func GenerateKeys() (Keys, error) {
 	}, nil
 }
 
+// decodeKey reads base64 with or without its trailing padding, and with the
+// whitespace a copy through a terminal or a secrets form tends to add. A key
+// pasted without its "=" is a key, not a mistake to fail a publish on.
+func decodeKey(s string) ([]byte, error) {
+	s = strings.TrimRight(strings.TrimSpace(s), "=")
+	b, err := base64.RawStdEncoding.DecodeString(s)
+	if err != nil {
+		return nil, fmt.Errorf("not base64: %w", err)
+	}
+	return b, nil
+}
+
 // Sign returns the detached signature of data, base64.
 func Sign(data []byte, privateKey string) (string, error) {
-	priv, err := base64.StdEncoding.DecodeString(privateKey)
+	priv, err := decodeKey(privateKey)
 	if err != nil || len(priv) != ed25519.PrivateKeySize {
 		return "", errors.New("private key: 64 bytes of base64 from keygen")
 	}
@@ -144,11 +157,11 @@ var ErrSignature = errors.New("index signature does not verify")
 
 // Verify checks a detached signature against the public key.
 func Verify(data []byte, signature, publicKey string) error {
-	pub, err := base64.StdEncoding.DecodeString(publicKey)
+	pub, err := decodeKey(publicKey)
 	if err != nil || len(pub) != ed25519.PublicKeySize {
 		return errors.New("public key: 32 bytes of base64 from keygen")
 	}
-	sig, err := base64.StdEncoding.DecodeString(signature)
+	sig, err := decodeKey(signature)
 	if err != nil {
 		return fmt.Errorf("signature: %w", err)
 	}

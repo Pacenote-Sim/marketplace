@@ -1,6 +1,7 @@
 package index_test
 
 import (
+	"strings"
 	"testing"
 	"time"
 
@@ -78,6 +79,12 @@ func TestSignVerify(t *testing.T) {
 	other, err := index.GenerateKeys()
 	require.NoError(t, err)
 	require.ErrorIs(t, index.Verify(data, sig, other.Public), index.ErrSignature)
+
+	// Padding lost in a copy, or a newline gained, is still the same key.
+	require.NoError(t, index.Verify(data, sig, strings.TrimRight(keys.Public, "=")+"\n"))
+	sig2, err := index.Sign(data, " "+strings.TrimRight(keys.Private, "=")+"\n")
+	require.NoError(t, err)
+	require.NoError(t, index.Verify(data, sig2, keys.Public))
 
 	_, err = index.Sign(data, "not a key")
 	require.Error(t, err)
