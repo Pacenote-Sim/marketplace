@@ -17,7 +17,7 @@ func BenchmarkBuildMarshal(b *testing.B) {
 	now := time.Now()
 	b.ReportAllocs()
 	for b.Loop() {
-		if _, err := index.Build(ms, nil, now).Marshal(); err != nil {
+		if _, err := index.Build(ms, nil, nil, now).Marshal(); err != nil {
 			b.Fatal(err)
 		}
 	}

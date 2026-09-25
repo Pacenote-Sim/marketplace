@@ -149,9 +149,12 @@ func TestRun_Options(t *testing.T) {
 func TestFetch(t *testing.T) {
 	t.Parallel()
 	ctx := context.Background()
-	dir, err := check.Fetch(ctx, fakeRunner{out: `{"Path":"x","Version":"v1","Dir":"/tmp/x@v1"}`}, "x", "v1")
+	dir, err := check.Fetch(ctx, fakeRunner{out: `{"Path":"x","Version":"v1","Dir":"/tmp/x@v1","Sum":"h1:abc"}`}, "x", "v1")
 	require.NoError(t, err)
 	assert.Equal(t, "/tmp/x@v1", dir)
+	mod, err := check.Download(ctx, fakeRunner{out: `{"Dir":"/tmp/x@v1","Sum":"h1:abc"}`}, "x", "v1")
+	require.NoError(t, err)
+	assert.Equal(t, "h1:abc", mod.Sum)
 
 	_, err = check.Fetch(ctx, fakeRunner{out: `{"Error":"no such tag"}`, err: errors.New("exit 1")}, "x", "v9")
 	require.ErrorContains(t, err, "no such tag")
@@ -162,8 +165,8 @@ func TestFetch(t *testing.T) {
 	_, err = check.Fetch(ctx, fakeRunner{out: `garbage`}, "x", "v9")
 	require.ErrorContains(t, err, "unexpected output")
 
-	_, err = check.Fetch(ctx, fakeRunner{out: `{}`}, "x", "v9")
-	require.ErrorContains(t, err, "no directory")
+	_, err = check.Fetch(ctx, fakeRunner{out: `{"Dir":"/tmp/x"}`}, "x", "v9")
+	require.ErrorContains(t, err, "no directory or sum")
 }
 
 func TestExec(t *testing.T) {

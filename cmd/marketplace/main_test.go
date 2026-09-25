@@ -333,6 +333,16 @@ versions:
 	code, _, _ = exec(t, "index", "--plugins", dir, "--artifacts", filepath.Join(dir, "missing.json"), "--out", idx)
 	assert.Equal(t, 2, code, "a missing artifacts file is a tool error")
 
+	mods := filepath.Join(dir, "modules.json")
+	require.NoError(t, os.WriteFile(mods, []byte(`[{"name":"demo-server","tag":"v0.1.0","sum":"h1:test"}]`), 0o600))
+	code, _, errs = exec(t, "index", "--plugins", dir, "--modules", mods, "--out", idx)
+	require.Equal(t, 0, code, errs)
+	data, err = os.ReadFile(idx)
+	require.NoError(t, err)
+	assert.Contains(t, string(data), `"module_hash": "h1:test"`)
+	code, _, _ = exec(t, "index", "--plugins", dir, "--modules", filepath.Join(dir, "missing.json"), "--out", idx)
+	assert.Equal(t, 2, code)
+
 	code, _, errs = exec(t, "build", "--policy", pol, "--plugins", dir, "--out", out)
 	assert.Equal(t, 2, code)
 	assert.Contains(t, errs, "base-url")

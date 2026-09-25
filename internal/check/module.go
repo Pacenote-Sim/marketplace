@@ -11,26 +11,42 @@ import (
 	"github.com/pacenote-sim/marketplace/internal/manifest"
 )
 
-// Fetch downloads module@tag through the module proxy and returns the
-// directory the toolchain unpacked it into. That directory is read-only, which
-// is right: nothing a check does may change what was reviewed.
-func Fetch(ctx context.Context, r Runner, module, tag string) (string, error) {
+// Module is what the toolchain reports about a downloaded module@tag.
+type Module struct {
+	// Dir is where the source was unpacked. Read-only, which is right:
+	// nothing a check does may change what was reviewed.
+	Dir string
+	// Sum is the module hash, "h1:…", the same value go.sum and the checksum
+	// database carry. The index records it so a private module, which the
+	// checksum database never sees, is pinned as firmly as a public one.
+	Sum string
+}
+
+// Download fetches module@tag through the module proxy.
+func Download(ctx context.Context, r Runner, module, tag string) (Module, error) {
 	out, err := r.Run(ctx, ".", []string{"GOFLAGS=-mod=mod"}, "go", "mod", "download", "-json", module+"@"+tag)
-	var info struct{ Dir, Error string }
+	var info struct{ Dir, Sum, Error string }
 	// go mod download prints the JSON even when it exits non-zero, with Error set.
 	if jerr := json.Unmarshal(bytes.TrimSpace(out), &info); jerr != nil {
 		if err != nil {
-			return "", fmt.Errorf("fetch %s@%s: %w", module, tag, err)
+			return Module{}, fmt.Errorf("fetch %s@%s: %w", module, tag, err)
 		}
-		return "", fmt.Errorf("fetch %s@%s: unexpected output: %s", module, tag, out)
+		return Module{}, fmt.Errorf("fetch %s@%s: unexpected output: %s", module, tag, out)
 	}
 	if info.Error != "" {
-		return "", fmt.Errorf("fetch %s@%s: %s", module, tag, info.Error)
+		return Module{}, fmt.Errorf("fetch %s@%s: %s", module, tag, info.Error)
 	}
-	if info.Dir == "" {
-		return "", fmt.Errorf("fetch %s@%s: no directory in the download report", module, tag)
+	if info.Dir == "" || info.Sum == "" {
+		return Module{}, fmt.Errorf("fetch %s@%s: no directory or sum in the download report", module, tag)
 	}
-	return info.Dir, nil
+	return Module{Dir: info.Dir, Sum: info.Sum}, nil
+}
+
+// Fetch downloads module@tag and returns the directory the toolchain unpacked
+// it into.
+func Fetch(ctx context.Context, r Runner, module, tag string) (string, error) {
+	m, err := Download(ctx, r, module, tag)
+	return m.Dir, err
 }
 
 // pluginJSON is what both plugin.json and client-plugin.json share, plus the

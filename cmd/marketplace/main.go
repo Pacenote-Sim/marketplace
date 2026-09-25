@@ -236,6 +236,17 @@ func buildCmd(ctx context.Context, args []string, stdout io.Writer) error {
 		fmt.Fprintf(stdout, "%s  %s/%s\n", r.SHA256[:12], r.Name+"-"+r.Tag, r.File)
 	}
 	fmt.Fprintf(stdout, "%d packages in %s\n", len(recs), *out)
+	if *dir != "" {
+		return nil // a local checkout has no module hash the proxy would agree with
+	}
+	hashes, err := artifacts.Hashes(ctx, runner, ms, *only)
+	if err != nil {
+		return fmt.Errorf("module hashes: %w", err)
+	}
+	if err := artifacts.WriteHashes(filepath.Join(*out, "modules.json"), hashes); err != nil {
+		return fmt.Errorf("module hashes: %w", err)
+	}
+	fmt.Fprintf(stdout, "%d module hashes in %s\n", len(hashes), filepath.Join(*out, "modules.json"))
 	return nil
 }
 
@@ -245,6 +256,7 @@ func indexCmd(args []string, stdout io.Writer) error {
 	plugins := fs.String("plugins", "plugins", "the manifests directory")
 	out := fs.String("out", "index.json", "where to write the index; the signature goes beside it as .sig")
 	arts := fs.String("artifacts", "", "artifacts.json from build, so the index carries downloads")
+	mods := fs.String("modules", "", "modules.json from build, so the index carries module hashes")
 	if err := fs.Parse(args); err != nil {
 		return fmt.Errorf("flags: %w", err)
 	}
@@ -259,7 +271,14 @@ func indexCmd(args []string, stdout io.Writer) error {
 			return fmt.Errorf("artifacts: %w", err)
 		}
 	}
-	data, err := index.Build(ms, downloads, time.Now()).Marshal()
+	var hashes map[index.ArtifactKey]string
+	if *mods != "" {
+		hashes, err = artifacts.LoadHashes(*mods)
+		if err != nil {
+			return fmt.Errorf("modules: %w", err)
+		}
+	}
+	data, err := index.Build(ms, downloads, hashes, time.Now()).Marshal()
 	if err != nil {
 		return fmt.Errorf("index: %w", err)
 	}

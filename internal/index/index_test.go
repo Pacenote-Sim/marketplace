@@ -30,7 +30,8 @@ func TestBuild_RoundTrip(t *testing.T) {
 	arts := map[index.ArtifactKey][]index.Artifact{
 		{Name: "demo", Tag: "v0.2.0"}: {{OS: "linux", Arch: "amd64", URL: "https://example.com/demo.zip", SHA256: "ab"}},
 	}
-	idx := index.Build(manifests(), arts, now)
+	hashes := map[index.ArtifactKey]string{{Name: "demo", Tag: "v0.2.0"}: "h1:abc"}
+	idx := index.Build(manifests(), arts, hashes, now)
 	require.Len(t, idx.Plugins, 1)
 	p := idx.Plugins[0]
 	assert.Equal(t, index.Format, idx.Format)
@@ -40,6 +41,8 @@ func TestBuild_RoundTrip(t *testing.T) {
 	assert.Nil(t, p.Versions[0].Artifacts, "no artifacts for the withdrawn tag")
 	assert.Equal(t, manifest.StatusWithdrawn, p.Versions[0].Status)
 	assert.Len(t, p.Versions[1].Artifacts, 1)
+	assert.Equal(t, "h1:abc", p.Versions[1].ModuleHash)
+	assert.Empty(t, p.Versions[0].ModuleHash)
 
 	data, err := idx.Marshal()
 	require.NoError(t, err)
@@ -47,7 +50,7 @@ func TestBuild_RoundTrip(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, idx, again)
 
-	data2, err := index.Build(manifests(), arts, now).Marshal()
+	data2, err := index.Build(manifests(), arts, hashes, now).Marshal()
 	require.NoError(t, err)
 	assert.Equal(t, data, data2, "the same manifests give the same bytes")
 }
@@ -65,7 +68,7 @@ func TestSignVerify(t *testing.T) {
 	t.Parallel()
 	keys, err := index.GenerateKeys()
 	require.NoError(t, err)
-	data, err := index.Build(manifests(), nil, time.Now()).Marshal()
+	data, err := index.Build(manifests(), nil, nil, time.Now()).Marshal()
 	require.NoError(t, err)
 
 	sig, err := index.Sign(data, keys.Private)

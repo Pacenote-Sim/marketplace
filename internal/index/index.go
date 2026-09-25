@@ -39,7 +39,11 @@ type Version struct {
 	InterfaceVersion int             `json:"interface_version"`
 	Status           manifest.Status `json:"status"`
 	Notes            string          `json:"notes,omitempty"`
-	Artifacts        []Artifact      `json:"artifacts,omitempty"`
+	// ModuleHash is the "h1:" hash of the module at this tag, as go.sum and the
+	// checksum database carry it. A server compares the module it fetched
+	// against it, so a private module is pinned as firmly as a public one.
+	ModuleHash string     `json:"module_hash,omitempty"`
+	Artifacts  []Artifact `json:"artifacts,omitempty"`
 }
 
 // Plugin is one listing.
@@ -71,9 +75,10 @@ type Index struct {
 // ArtifactKey names the build of one tag of one plugin.
 type ArtifactKey struct{ Name, Tag string }
 
-// Build turns manifests into an index. artifacts may be nil while nothing has
-// been built yet; the plugin is then listed without downloads.
-func Build(ms []*manifest.Manifest, artifacts map[ArtifactKey][]Artifact, now time.Time) *Index {
+// Build turns manifests into an index. artifacts and hashes may be nil while
+// nothing has been built or fetched yet; the plugin is then listed without
+// downloads or a module hash.
+func Build(ms []*manifest.Manifest, artifacts map[ArtifactKey][]Artifact, hashes map[ArtifactKey]string, now time.Time) *Index {
 	idx := &Index{Format: Format, Generated: now.UTC().Truncate(time.Second), Plugins: make([]Plugin, 0, len(ms))}
 	for _, m := range ms {
 		p := Plugin{
@@ -85,7 +90,8 @@ func Build(ms []*manifest.Manifest, artifacts map[ArtifactKey][]Artifact, now ti
 		for _, v := range m.Versions {
 			p.Versions = append(p.Versions, Version{
 				Tag: v.Tag, Approved: v.Approved, InterfaceVersion: v.InterfaceVersion,
-				Status: v.Status, Notes: v.Notes, Artifacts: artifacts[ArtifactKey{m.Name, v.Tag}],
+				Status: v.Status, Notes: v.Notes, ModuleHash: hashes[ArtifactKey{m.Name, v.Tag}],
+				Artifacts: artifacts[ArtifactKey{m.Name, v.Tag}],
 			})
 		}
 		idx.Plugins = append(idx.Plugins, p)

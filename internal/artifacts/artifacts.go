@@ -277,3 +277,63 @@ func ToMap(records []Record) map[index.ArtifactKey][]index.Artifact {
 	}
 	return out
 }
+
+// Hash is one approved tag's module hash, as written to modules.json.
+type Hash struct {
+	Name string `json:"name"`
+	Tag  string `json:"tag"`
+	Sum  string `json:"sum"`
+}
+
+// Hashes fetches every approved version of every plugin and records the
+// module hash the toolchain reports. Every kind, not only client plugins: a
+// server plugin's source is pinned the same way, beside its packages.
+func Hashes(ctx context.Context, r check.Runner, ms []*manifest.Manifest, only string) ([]Hash, error) {
+	var out []Hash
+	for _, m := range ms {
+		if only != "" && m.Name != only {
+			continue
+		}
+		for _, v := range m.Versions {
+			if v.Status != manifest.StatusApproved {
+				continue
+			}
+			mod, err := check.Download(ctx, r, m.Module, v.Tag)
+			if err != nil {
+				return nil, fmt.Errorf("%s %s: %w", m.Name, v.Tag, err)
+			}
+			out = append(out, Hash{Name: m.Name, Tag: v.Tag, Sum: mod.Sum})
+		}
+	}
+	return out, nil
+}
+
+// WriteHashes writes modules.json.
+func WriteHashes(name string, hashes []Hash) error {
+	data, err := json.MarshalIndent(hashes, "", "  ")
+	if err != nil {
+		return fmt.Errorf("modules.json: %w", err)
+	}
+	//nolint:gosec // modules.json is a build output, read by the next step
+	if err := os.WriteFile(name, append(data, '\n'), 0o644); err != nil {
+		return fmt.Errorf("write %s: %w", name, err)
+	}
+	return nil
+}
+
+// LoadHashes reads modules.json into the map the index builder takes.
+func LoadHashes(name string) (map[index.ArtifactKey]string, error) {
+	data, err := os.ReadFile(name) //nolint:gosec // the build output named on the command line
+	if err != nil {
+		return nil, fmt.Errorf("read %s: %w", name, err)
+	}
+	var hashes []Hash
+	if err := json.Unmarshal(data, &hashes); err != nil {
+		return nil, fmt.Errorf("%s: %w", name, err)
+	}
+	out := make(map[index.ArtifactKey]string, len(hashes))
+	for _, h := range hashes {
+		out[index.ArtifactKey{Name: h.Name, Tag: h.Tag}] = h.Sum
+	}
+	return out, nil
+}

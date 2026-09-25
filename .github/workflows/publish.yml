@@ -14,6 +14,11 @@ on:
       - "plugins/**"
       - "policy/**"
       - "PUBLIC_KEY"
+      # The tool shapes the index and the packages, so a change to it republishes too.
+      - "cmd/**"
+      - "internal/**"
+      - "go.mod"
+      - ".github/workflows/publish.yml"
   workflow_dispatch:
 
 permissions:
@@ -71,7 +76,7 @@ jobs:
           MARKETPLACE_SIGNING_KEY: ${{ secrets.MARKETPLACE_SIGNING_KEY }}
         run: |
           mkdir -p site
-          go run ./cmd/marketplace index --artifacts dist/artifacts.json --out site/index.json
+          go run ./cmd/marketplace index --artifacts dist/artifacts.json --modules dist/modules.json --out site/index.json
           test -f site/index.json.sig || { echo "MARKETPLACE_SIGNING_KEY is not set; refusing to publish an unsigned index"; exit 1; }
           cp PUBLIC_KEY site/PUBLIC_KEY
           go run ./cmd/marketplace verify --pub "$(cat PUBLIC_KEY)" site/index.json

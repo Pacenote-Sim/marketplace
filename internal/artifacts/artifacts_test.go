@@ -226,3 +226,50 @@ func TestBuild_UnwritableOutput(t *testing.T) {
 	_, err = artifacts.Build(context.Background(), artifacts.Options{Manifests: []*manifest.Manifest{m}, Policy: p, Runner: check.Exec{}, Source: ok, OutDir: out, BaseURL: "https://x"})
 	require.ErrorContains(t, err, "create")
 }
+
+func TestHashes(t *testing.T) {
+	t.Parallel()
+	m, _ := fixtureServer(t)
+	client := &manifest.Manifest{
+		Name: "client-x", Kind: manifest.KindCompanion, Module: "example.test/x",
+		Versions: []manifest.Version{{Tag: "v1.0.0", Status: manifest.StatusApproved}},
+	}
+	r := sums{"example.test/srv@v0.1.0": "h1:srv", "example.test/x@v1.0.0": "h1:x"}
+	hashes, err := artifacts.Hashes(context.Background(), r, []*manifest.Manifest{m, client}, "")
+	require.NoError(t, err)
+	require.Len(t, hashes, 2, "one per approved tag, of every kind; the withdrawn tag is skipped")
+	assert.Equal(t, artifacts.Hash{Name: "client-x", Tag: "v1.0.0", Sum: "h1:x"}, hashes[1])
+
+	only, err := artifacts.Hashes(context.Background(), r, []*manifest.Manifest{m, client}, "client-x")
+	require.NoError(t, err)
+	assert.Len(t, only, 1)
+
+	_, err = artifacts.Hashes(context.Background(), sums{}, []*manifest.Manifest{m}, "")
+	require.ErrorContains(t, err, "demo v0.1.0")
+
+	name := filepath.Join(t.TempDir(), "modules.json")
+	require.NoError(t, artifacts.WriteHashes(name, hashes))
+	loaded, err := artifacts.LoadHashes(name)
+	require.NoError(t, err)
+	assert.Equal(t, "h1:srv", loaded[struct{ Name, Tag string }{"demo", "v0.1.0"}])
+
+	require.Error(t, artifacts.WriteHashes(filepath.Join(t.TempDir(), "no", "dir", "x.json"), hashes))
+	_, err = artifacts.LoadHashes(filepath.Join(t.TempDir(), "missing.json"))
+	require.Error(t, err)
+	require.NoError(t, os.WriteFile(name, []byte("{"), 0o600))
+	_, err = artifacts.LoadHashes(name)
+	require.Error(t, err)
+}
+
+// sums answers go mod download with a Sum per module@tag, and an error for
+// anything it does not know.
+type sums map[string]string
+
+func (s sums) Run(_ context.Context, _ string, _ []string, _ string, args ...string) ([]byte, error) {
+	key := args[len(args)-1]
+	sum, ok := s[key]
+	if !ok {
+		return []byte(`{"Error":"unknown module"}`), errors.New("exit 1")
+	}
+	return []byte(`{"Dir":"/tmp/` + key + `","Sum":"` + sum + `"}`), nil
+}
