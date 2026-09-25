@@ -9,6 +9,7 @@
 package check
 
 import (
+	"bytes"
 	"context"
 	"errors"
 	"fmt"
@@ -68,13 +69,21 @@ type Exec struct{}
 // Run runs name with args in dir, with env added to the process environment.
 // GOWORK is always off: a plugin is checked as a checkout of its own, never as
 // part of a workspace that might replace its dependencies.
+//
+// Only standard output comes back: the toolchain prints "go: downloading …"
+// and its diagnostics on standard error, and a caller parsing JSON must not
+// see them. On failure both streams go into the error, which is what a
+// finding shows.
 func (Exec) Run(ctx context.Context, dir string, env []string, name string, args ...string) ([]byte, error) {
 	cmd := exec.CommandContext(ctx, name, args...) //nolint:gosec // running the toolchain on a reviewed checkout is this type's job
 	cmd.Dir = dir
 	cmd.Env = append(append(os.Environ(), "GOWORK=off", "GOTOOLCHAIN=local"), env...)
-	out, err := cmd.CombinedOutput()
+	var stderr bytes.Buffer
+	cmd.Stderr = &stderr
+	out, err := cmd.Output()
 	if err != nil {
-		return out, fmt.Errorf("%s %s: %w\n%s", name, strings.Join(args, " "), err, strings.TrimSpace(string(out)))
+		detail := strings.TrimSpace(stderr.String() + "\n" + string(out))
+		return out, fmt.Errorf("%s %s: %w\n%s", name, strings.Join(args, " "), err, detail)
 	}
 	return out, nil
 }

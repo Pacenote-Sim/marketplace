@@ -173,6 +173,11 @@ func TestExec(t *testing.T) {
 	assert.Equal(t, "off", strings.TrimSpace(string(out)), "checks never run inside a workspace")
 	_, err = check.Exec{}.Run(context.Background(), ".", nil, "go", "no-such-command")
 	require.Error(t, err)
+	assert.Contains(t, err.Error(), "unknown command", "standard error is in the error")
+
+	out, err = check.Exec{}.Run(context.Background(), ".", nil, "sh", "-c", "echo noise >&2; echo '{\"ok\":true}'")
+	require.NoError(t, err)
+	assert.JSONEq(t, `{"ok":true}`, string(out), "standard error never mixes into what a caller parses")
 }
 
 func TestRun_ListFails(t *testing.T) {
