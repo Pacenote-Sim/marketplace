@@ -1,0 +1,84 @@
+# Every merge that touches a manifest or the policy publishes: the server-plugin
+# packages are built from the approved tags and attached to releases on this
+# repository, then the index is generated, signed and put on GitHub Pages, from
+# where pacenote.tech serves it under /marketplace/.
+#
+# Builds are reproducible, so re-uploading a package that already exists
+# writes the same bytes; a release is created the first time and updated after.
+name: publish
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "plugins/**"
+      - "policy/**"
+      - "PUBLIC_KEY"
+  workflow_dispatch:
+
+permissions:
+  contents: write   # releases
+  pages: write
+  id-token: write
+
+concurrency:
+  group: publish
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    name: build packages, sign and publish the index
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    environment:
+      name: github-pages
+      url: ${{ steps.deploy.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: actions/setup-go@v7
+        with:
+          go-version: "1.26"
+
+      - name: private modules
+        env:
+          REVIEW_TOKEN: ${{ secrets.PACENOTE_REVIEW_TOKEN }}
+        run: |
+          if [ -n "$REVIEW_TOKEN" ]; then
+            git config --global url."https://pacenote-review:${REVIEW_TOKEN}@github.com/".insteadOf "https://github.com/"
+            echo "GOPRIVATE=github.com/*" >> "$GITHUB_ENV"
+          fi
+
+      - name: build the server-plugin packages
+        run: go run ./cmd/marketplace build --out dist --base-url "https://github.com/${{ github.repository }}/releases/download"
+
+      - name: attach the packages to releases
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          for dir in dist/*/; do
+            rel=$(basename "$dir")
+            if gh release view "$rel" >/dev/null 2>&1; then
+              gh release upload "$rel" "$dir"/* --clobber
+            else
+              gh release create "$rel" "$dir"/* --title "$rel" --notes "Built by the marketplace from the approved tag. Verify with checksums.txt."
+            fi
+          done
+
+      - name: generate and sign the index
+        env:
+          MARKETPLACE_SIGNING_KEY: ${{ secrets.MARKETPLACE_SIGNING_KEY }}
+        run: |
+          mkdir -p site
+          go run ./cmd/marketplace index --artifacts dist/artifacts.json --out site/index.json
+          test -f site/index.json.sig || { echo "MARKETPLACE_SIGNING_KEY is not set; refusing to publish an unsigned index"; exit 1; }
+          cp PUBLIC_KEY site/PUBLIC_KEY
+          go run ./cmd/marketplace verify --pub "$(cat PUBLIC_KEY)" site/index.json
+          printf '<!doctype html><meta http-equiv="refresh" content="0;url=https://www.pacenote.tech/plugins/">' > site/index.html
+
+      - uses: actions/upload-pages-artifact@v4
+        with:
+          path: site
+      - id: deploy
+        uses: actions/deploy-pages@v5

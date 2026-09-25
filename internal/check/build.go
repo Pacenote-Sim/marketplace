@@ -26,10 +26,26 @@ func readFile(name string) ([]byte, error) {
 // checkBuild compiles the module for every platform the policy names, with
 // CGO_ENABLED=0, then vets it and confirms go.mod and go.sum are tidy. A plugin
 // that needs cgo fails here and is not eligible; that is the rule, not a gap.
+//
+// Binaries go to a scratch directory: with a single main package, go build
+// would otherwise write the executable into the module being checked.
 func checkBuild(ctx context.Context, r *Report, o Options) {
+	scratch, err := os.MkdirTemp("", "marketplace-check-")
+	if err != nil {
+		r.add("build", Fail, "temp dir: %v", err)
+		return
+	}
+	defer func() { _ = os.RemoveAll(scratch) }()
 	for _, pl := range o.Policy.PlatformsFor(o.Manifest.Kind) {
 		env := []string{"CGO_ENABLED=0", "GOOS=" + pl.OS, "GOARCH=" + pl.Arch}
-		if _, err := o.Runner.Run(ctx, o.Dir, env, "go", "build", "./..."); err != nil {
+		out := filepath.Join(scratch, pl.OS+"_"+pl.Arch) + string(filepath.Separator)
+		_, err := o.Runner.Run(ctx, o.Dir, env, "go", "build", "-o", out, "./...")
+		if err != nil && strings.Contains(err.Error(), "no main packages to build") {
+			// A library-only module, which is what most client plugins are:
+			// nothing would be written anywhere, so build it plainly.
+			_, err = o.Runner.Run(ctx, o.Dir, env, "go", "build", "./...")
+		}
+		if err != nil {
 			r.add("build", Fail, "%s: %s", pl, firstLines(err, 6))
 			continue
 		}

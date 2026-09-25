@@ -3,6 +3,7 @@
 //
 //	marketplace validate [plugins/...]      the manifests, and the names against each other
 //	marketplace check plugins/<name>.yaml   one plugin's newest approved tag, fetched from the proxy
+//	marketplace build                       the server-plugin packages, from the approved tags
 //	marketplace index                       index.json from the manifests, signed if a key is given
 //	marketplace verify index.json           the signature, with the public key
 //	marketplace keygen                      a fresh signing pair
@@ -19,6 +20,7 @@ import (
 	"path/filepath"
 	"time"
 
+	"github.com/pacenote-sim/marketplace/internal/artifacts"
 	"github.com/pacenote-sim/marketplace/internal/check"
 	"github.com/pacenote-sim/marketplace/internal/index"
 	"github.com/pacenote-sim/marketplace/internal/manifest"
@@ -36,6 +38,7 @@ const usage = `usage: marketplace <command> [flags]
 
   validate [files...]   validate manifests (default: plugins/*.yaml)
   check <file>          check one plugin's newest approved tag, or --tag, or --dir
+  build                 build the server-plugin packages into --out, with artifacts.json
   index                 write index.json (and .sig when MARKETPLACE_SIGNING_KEY is set)
   verify <index>        verify index.json against --pub or MARKETPLACE_PUBLIC_KEY
   keygen                print a new signing key pair
@@ -52,6 +55,8 @@ func run(ctx context.Context, args []string, stdout, stderr io.Writer) int {
 		err = validate(args[1:], stdout)
 	case "check":
 		err = checkCmd(ctx, args[1:], stdout)
+	case "build":
+		err = buildCmd(ctx, args[1:], stdout)
 	case "index":
 		err = indexCmd(args[1:], stdout)
 	case "verify":
@@ -187,11 +192,59 @@ func checkCmd(ctx context.Context, args []string, stdout io.Writer) error {
 	return nil
 }
 
+func buildCmd(ctx context.Context, args []string, stdout io.Writer) error {
+	fs := flag.NewFlagSet("build", flag.ContinueOnError)
+	fs.SetOutput(io.Discard) // errors are returned, not printed twice
+	pol := fs.String("policy", "policy", "the policy directory")
+	plugins := fs.String("plugins", "plugins", "the manifests directory")
+	out := fs.String("out", "dist", "where the packages and artifacts.json go")
+	base := fs.String("base-url", "", "where the packages will be downloadable from: <base-url>/<name>-<tag>/<file>")
+	only := fs.String("only", "", "build one plugin by name")
+	dir := fs.String("dir", "", "a local checkout to build from, with --only, instead of fetching the tag")
+	if err := fs.Parse(args); err != nil {
+		return fmt.Errorf("flags: %w", err)
+	}
+	if *base == "" {
+		return errors.New("build: --base-url is required")
+	}
+	if *dir != "" && *only == "" {
+		return errors.New("build: --dir needs --only")
+	}
+	p, err := policy.Load(*pol)
+	if err != nil {
+		return fmt.Errorf("policy: %w", err)
+	}
+	ms, err := manifest.LoadDir(*plugins)
+	if err != nil {
+		return fmt.Errorf("%w: %w", errFailed, err)
+	}
+	runner := check.Exec{}
+	source := func(ctx context.Context, module, tag string) (string, error) {
+		if *dir != "" {
+			return *dir, nil
+		}
+		fmt.Fprintf(stdout, "fetching %s@%s\n", module, tag)
+		return check.Fetch(ctx, runner, module, tag)
+	}
+	recs, err := artifacts.Build(ctx, artifacts.Options{
+		Manifests: ms, Policy: p, Runner: runner, Source: source, OutDir: *out, BaseURL: *base, Only: *only,
+	})
+	if err != nil {
+		return fmt.Errorf("build: %w", err)
+	}
+	for _, r := range recs {
+		fmt.Fprintf(stdout, "%s  %s/%s\n", r.SHA256[:12], r.Name+"-"+r.Tag, r.File)
+	}
+	fmt.Fprintf(stdout, "%d packages in %s\n", len(recs), *out)
+	return nil
+}
+
 func indexCmd(args []string, stdout io.Writer) error {
 	fs := flag.NewFlagSet("index", flag.ContinueOnError)
 	fs.SetOutput(io.Discard) // errors are returned, not printed twice
 	plugins := fs.String("plugins", "plugins", "the manifests directory")
 	out := fs.String("out", "index.json", "where to write the index; the signature goes beside it as .sig")
+	arts := fs.String("artifacts", "", "artifacts.json from build, so the index carries downloads")
 	if err := fs.Parse(args); err != nil {
 		return fmt.Errorf("flags: %w", err)
 	}
@@ -199,7 +252,14 @@ func indexCmd(args []string, stdout io.Writer) error {
 	if err != nil {
 		return fmt.Errorf("%w: %w", errFailed, err)
 	}
-	data, err := index.Build(ms, nil, time.Now()).Marshal()
+	var downloads map[index.ArtifactKey][]index.Artifact
+	if *arts != "" {
+		downloads, err = artifacts.Load(*arts)
+		if err != nil {
+			return fmt.Errorf("artifacts: %w", err)
+		}
+	}
+	data, err := index.Build(ms, downloads, time.Now()).Marshal()
 	if err != nil {
 		return fmt.Errorf("index: %w", err)
 	}

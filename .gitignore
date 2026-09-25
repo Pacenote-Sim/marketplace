@@ -2,3 +2,4 @@ coverage.out
 index.json
 index.json.sig
 /marketplace
+.gstack/

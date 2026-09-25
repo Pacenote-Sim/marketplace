@@ -293,3 +293,63 @@ func parseKeys(t *testing.T, out string) (pub, priv string) {
 	require.NotEmpty(t, priv)
 	return pub, priv
 }
+
+func TestBuild(t *testing.T) {
+	dir := t.TempDir()
+	m := `name: demo-server
+kind: server
+title: Demo
+summary: The good server fixture, built through the command.
+author: t
+contact: t@example.com
+repository: https://github.com/x/y
+module: example.test/server-ok
+licence: MIT
+visibility: public
+pricing: free
+calls: [api.example-vendor.com]
+versions:
+  - {tag: v0.1.0, approved: 2026-09-24, reviewer: r, interface_version: 3, status: approved}
+`
+	require.NoError(t, os.WriteFile(filepath.Join(dir, "demo-server.yaml"), []byte(m), 0o600))
+	fixture, err := filepath.Abs("../../internal/check/testdata/server-ok")
+	require.NoError(t, err)
+	out := filepath.Join(dir, "dist")
+
+	code, stdout, errs := exec(t, "build", "--policy", pol, "--plugins", dir, "--out", out, "--base-url", "https://example.com/dl", "--only", "demo-server", "--dir", fixture)
+	require.Equal(t, 0, code, errs)
+	assert.Contains(t, stdout, "5 packages")
+	_, err = os.Stat(filepath.Join(out, "demo-server-v0.1.0", "demo-server_0.1.0_windows_amd64.zip"))
+	require.NoError(t, err)
+
+	idx := filepath.Join(dir, "index.json")
+	t.Setenv("MARKETPLACE_SIGNING_KEY", "")
+	code, _, errs = exec(t, "index", "--plugins", dir, "--artifacts", filepath.Join(out, "artifacts.json"), "--out", idx)
+	require.Equal(t, 0, code, errs)
+	data, err := os.ReadFile(idx)
+	require.NoError(t, err)
+	assert.Contains(t, string(data), "https://example.com/dl/demo-server-v0.1.0/demo-server_0.1.0_linux_amd64.zip")
+
+	code, _, _ = exec(t, "index", "--plugins", dir, "--artifacts", filepath.Join(dir, "missing.json"), "--out", idx)
+	assert.Equal(t, 2, code, "a missing artifacts file is a tool error")
+
+	code, _, errs = exec(t, "build", "--policy", pol, "--plugins", dir, "--out", out)
+	assert.Equal(t, 2, code)
+	assert.Contains(t, errs, "base-url")
+	code, _, errs = exec(t, "build", "--policy", pol, "--plugins", dir, "--out", out, "--base-url", "https://x", "--dir", fixture)
+	assert.Equal(t, 2, code)
+	assert.Contains(t, errs, "needs --only")
+	code, _, _ = exec(t, "build", "--policy", t.TempDir(), "--plugins", dir, "--out", out, "--base-url", "https://x")
+	assert.Equal(t, 2, code)
+	broken := t.TempDir()
+	require.NoError(t, os.WriteFile(filepath.Join(broken, "x.yaml"), []byte("name: ["), 0o600))
+	code, _, _ = exec(t, "build", "--policy", pol, "--plugins", broken, "--out", out, "--base-url", "https://x")
+	assert.Equal(t, 1, code)
+	code, _, _ = exec(t, "build", "--nope")
+	assert.Equal(t, 2, code)
+
+	t.Setenv("GOPROXY", "off")
+	code, _, errs = exec(t, "build", "--policy", pol, "--plugins", dir, "--out", out, "--base-url", "https://x")
+	assert.Equal(t, 2, code, "fetching a module that is not on any proxy fails")
+	assert.Contains(t, errs, "build:")
+}

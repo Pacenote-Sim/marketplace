@@ -18,6 +18,7 @@ make check-plugins  # fetch and check every listed plugin; network, minutes
 | `internal/manifest` | a manifest is refused for every way it can be wrong, and accepted when right; the seven official manifests parse; look-alike names collide |
 | `internal/policy` | the policy files in `policy/` load, and answer for each kind |
 | `internal/index` | an index is built deterministically from manifests, round-trips through JSON, and a signature verifies with the right key and fails with the wrong one or a changed byte |
+| `internal/artifacts` | a server plugin is packaged as the folder the server takes, one zip per platform with fixed timestamps so two builds match; the checksums and artifacts.json are written; every way a build can fail is an error |
 | `internal/check` | against fixture modules under `testdata/`: a good companion passes every check; a bad one is caught on the licence, the imports, the denied symbols and the undeclared host; a server plugin builds the same bytes twice; the runner runs real commands |
 
 The checks run the real Go toolchain on the fixtures, offline: the fixtures import nothing outside
